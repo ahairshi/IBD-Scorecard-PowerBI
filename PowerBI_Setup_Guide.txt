@@ -1,0 +1,127 @@
+=====================================================
+POWER BI SETUP GUIDE FOR IBD SCORECARD DATA
+=====================================================
+
+STEP 1: OPEN POWER BI DESKTOP
+-----------------------------
+1. Launch Power BI Desktop
+2. Click "Get Data" 
+3. Select "More..." 
+4. Choose "File" → "Folder"
+5. Browse to: C:\Users\ahamedirshad\PowerBI_Data
+6. Click "OK"
+
+STEP 2: POWER QUERY TRANSFORMATION
+---------------------------------
+When the Navigator opens:
+1. Click "Transform Data" (don't click Load yet)
+2. Power BI will show all your parquet files
+
+In Power Query Editor, follow these steps:
+
+A) COMBINE FILES:
+   - Click "Combine Files" button (should appear automatically)
+   - Power BI will create a combined table from all parquet files
+
+B) ADD DATE COLUMN FROM FILENAME:
+   - Right-click on "Source.Name" column
+   - Select "Duplicate Column"
+   - Rename the new column to "Period"
+   - Select the "Period" column
+   - Go to Transform tab → "Extract" → "Text Before Delimiter"
+   - Use delimiter: "_" (underscore)
+   - This will extract "202401" from "202401_ibd_scorecard.parquet"
+
+C) CONVERT TO PROPER DATE:
+   - Select the "Period" column
+   - Go to Transform tab → "Data Type" → "Text"
+   - Add Custom Column: Add Column → Custom Column
+   - Column Name: "Date"
+   - Formula: = Date.FromText(Text.Start([Period],4) & "-" & Text.Middle([Period],4,2) & "-01")
+   - This converts "202401" to 2024-01-01
+
+D) CLEAN UP:
+   - Remove unnecessary columns like file paths
+   - Rename columns to be more user-friendly
+   - Set proper data types for all columns
+
+STEP 3: CLOSE & APPLY
+-------------------
+1. Click "Close & Apply" in Power Query Editor
+2. Power BI will load all your data
+
+STEP 4: CREATE BASIC MEASURES
+----------------------------
+In Power BI, create these DAX measures:
+
+Current Month Score = 
+CALCULATE(
+    AVERAGE('YourTableName'[ScoreColumn]),
+    'YourTableName'[Date] = MAX('YourTableName'[Date])
+)
+
+Previous Month Score = 
+CALCULATE(
+    AVERAGE('YourTableName'[ScoreColumn]),
+    'YourTableName'[Date] = EDATE(MAX('YourTableName'[Date]), -1)
+)
+
+Month over Month Change = 
+[Current Month Score] - [Previous Month Score]
+
+Year over Year Change = 
+CALCULATE(
+    AVERAGE('YourTableName'[ScoreColumn]),
+    'YourTableName'[Date] = MAX('YourTableName'[Date])
+) - 
+CALCULATE(
+    AVERAGE('YourTableName'[ScoreColumn]),
+    'YourTableName'[Date] = EDATE(MAX('YourTableName'[Date]), -12)
+)
+
+STEP 5: CREATE VISUALIZATIONS
+----------------------------
+Recommended visuals:
+
+1. KPI CARDS (Top Row):
+   - Current Month Score
+   - Month over Month Change
+   - Year over Year Change
+   - Total Records
+
+2. LINE CHART:
+   - X-axis: Date
+   - Y-axis: Average Score
+   - Shows trend over time
+
+3. COLUMN CHART:
+   - X-axis: Date (by month)
+   - Y-axis: Score
+   - Compare monthly performance
+
+4. TABLE/MATRIX:
+   - Rows: Date
+   - Values: Detailed metrics
+   - For drill-down analysis
+
+STEP 6: FORMATTING TIPS
+----------------------
+- Use consistent color scheme
+- Add filters for date ranges
+- Create bookmarks for different views
+- Add tooltips with additional context
+
+STEP 7: REFRESH SETUP
+-------------------
+For future data updates:
+1. Download new parquet files to the same folder structure
+2. In Power BI, click "Refresh" 
+3. Power BI will automatically include new files
+
+TROUBLESHOOTING:
+===============
+- If columns don't match between files, check data consistency
+- If dates don't parse correctly, adjust the date formula
+- If performance is slow, consider filtering data in Power Query
+
+Next Steps: Open Power BI Desktop and follow Step 1!

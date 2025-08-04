@@ -1,0 +1,61 @@
+// ========================================
+// POWER QUERY M SCRIPT FOR IBD SCORECARD
+// ========================================
+// Copy and paste this into Power BI Advanced Editor
+
+let
+    // Set the folder path to your PowerBI_Data folder
+    Source = Folder.Files("C:\Users\ahamedirshad\PowerBI_Data"),
+    
+    // Filter only parquet files
+    FilteredRows = Table.SelectRows(Source, each ([Extension] = ".parquet")),
+    
+    // Add a custom column to extract period from filename
+    AddPeriod = Table.AddColumn(FilteredRows, "Period", each Text.BeforeDelimiter([Name], "_")),
+    
+    // Add a proper date column
+    AddDate = Table.AddColumn(AddPeriod, "Date", each 
+        Date.FromText(
+            Text.Start([Period], 4) & "-" & 
+            Text.Middle([Period], 4, 2) & "-01"
+        )
+    ),
+    
+    // Add Year and Month columns for easier filtering
+    AddYear = Table.AddColumn(AddDate, "Year", each Date.Year([Date])),
+    AddMonth = Table.AddColumn(AddYear, "Month", each Date.Month([Date])),
+    AddMonthName = Table.AddColumn(AddMonth, "MonthName", each Date.MonthName([Date])),
+    
+    // Function to combine all parquet files
+    CombineFiles = Table.AddColumn(AddMonthName, "Data", each Parquet.Document([Content])),
+    
+    // Expand the data from all files
+    ExpandData = Table.ExpandTable(CombineFiles, "Data", 
+        // Note: Replace these column names with actual columns from your parquet files
+        // You'll need to check the first file to see what columns exist
+        {"Column1", "Column2", "Column3"}, // <-- UPDATE THESE COLUMN NAMES
+        {"Column1", "Column2", "Column3"}  // <-- UPDATE THESE COLUMN NAMES
+    ),
+    
+    // Clean up - remove unnecessary columns
+    RemoveUnnecessary = Table.RemoveColumns(ExpandData, {
+        "Content", "Name", "Extension", "Date Accessed", 
+        "Date Modified", "Date Created", "Attributes", "Folder Path"
+    }),
+    
+    // Reorder columns to put Date first
+    ReorderColumns = Table.ReorderColumns(RemoveUnnecessary, 
+        {"Date", "Year", "Month", "MonthName", "Period"}
+    )
+in
+    ReorderColumns
+
+// ========================================
+// INSTRUCTIONS:
+// 1. Open Power BI Desktop
+// 2. Get Data > Blank Query
+// 3. Go to Advanced Editor
+// 4. Replace all text with this script
+// 5. Update the column names in the ExpandData step
+// 6. Click Done
+// ========================================

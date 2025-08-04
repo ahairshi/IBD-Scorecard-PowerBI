@@ -1,0 +1,238 @@
+===============================================
+DAX MEASURES FOR IBD SCORECARD DASHBOARD
+===============================================
+
+// NOTE: Replace 'IBD_Scorecard' with your actual table name
+// Replace 'Score' with your actual score column name
+
+// ======================
+// BASIC AGGREGATIONS
+// ======================
+
+Total Rows = 
+COUNTROWS('IBD_Scorecard')
+
+Average Score = 
+AVERAGE('IBD_Scorecard'[Score])
+
+Max Score = 
+MAX('IBD_Scorecard'[Score])
+
+Min Score = 
+MIN('IBD_Scorecard'[Score])
+
+// ======================
+// CURRENT PERIOD METRICS
+// ======================
+
+Current Month Score = 
+CALCULATE(
+    AVERAGE('IBD_Scorecard'[Score]),
+    'IBD_Scorecard'[Date] = MAX('IBD_Scorecard'[Date])
+)
+
+Current Month Records = 
+CALCULATE(
+    COUNTROWS('IBD_Scorecard'),
+    'IBD_Scorecard'[Date] = MAX('IBD_Scorecard'[Date])
+)
+
+// ======================
+// COMPARISON METRICS
+// ======================
+
+Previous Month Score = 
+CALCULATE(
+    AVERAGE('IBD_Scorecard'[Score]),
+    'IBD_Scorecard'[Date] = EDATE(MAX('IBD_Scorecard'[Date]), -1)
+)
+
+Month over Month Change = 
+[Current Month Score] - [Previous Month Score]
+
+Month over Month % Change = 
+DIVIDE([Month over Month Change], [Previous Month Score], 0)
+
+Previous Year Same Month Score = 
+CALCULATE(
+    AVERAGE('IBD_Scorecard'[Score]),
+    'IBD_Scorecard'[Date] = EDATE(MAX('IBD_Scorecard'[Date]), -12)
+)
+
+Year over Year Change = 
+[Current Month Score] - [Previous Year Same Month Score]
+
+Year over Year % Change = 
+DIVIDE([Year over Year Change], [Previous Year Same Month Score], 0)
+
+// ======================
+// TREND ANALYSIS
+// ======================
+
+3 Month Moving Average = 
+CALCULATE(
+    AVERAGE('IBD_Scorecard'[Score]),
+    FILTER(
+        ALL('IBD_Scorecard'),
+        'IBD_Scorecard'[Date] >= EDATE(MAX('IBD_Scorecard'[Date]), -2) &&
+        'IBD_Scorecard'[Date] <= MAX('IBD_Scorecard'[Date])
+    )
+)
+
+6 Month Moving Average = 
+CALCULATE(
+    AVERAGE('IBD_Scorecard'[Score]),
+    FILTER(
+        ALL('IBD_Scorecard'),
+        'IBD_Scorecard'[Date] >= EDATE(MAX('IBD_Scorecard'[Date]), -5) &&
+        'IBD_Scorecard'[Date] <= MAX('IBD_Scorecard'[Date])
+    )
+)
+
+12 Month Moving Average = 
+CALCULATE(
+    AVERAGE('IBD_Scorecard'[Score]),
+    FILTER(
+        ALL('IBD_Scorecard'),
+        'IBD_Scorecard'[Date] >= EDATE(MAX('IBD_Scorecard'[Date]), -11) &&
+        'IBD_Scorecard'[Date] <= MAX('IBD_Scorecard'[Date])
+    )
+)
+
+// ======================
+// RANKING & PERFORMANCE
+// ======================
+
+Monthly Rank = 
+RANKX(
+    ALL('IBD_Scorecard'[Date]),
+    CALCULATE(AVERAGE('IBD_Scorecard'[Score])),
+    ,
+    DESC
+)
+
+Best Month Score = 
+CALCULATE(
+    MAX('IBD_Scorecard'[Score]),
+    ALL('IBD_Scorecard')
+)
+
+Worst Month Score = 
+CALCULATE(
+    MIN('IBD_Scorecard'[Score]),
+    ALL('IBD_Scorecard')
+)
+
+Performance vs Best = 
+[Current Month Score] - [Best Month Score]
+
+Performance vs Worst = 
+[Current Month Score] - [Worst Month Score]
+
+// ======================
+// CONDITIONAL FORMATTING
+// ======================
+
+Trend Indicator = 
+IF(
+    [Month over Month Change] > 0,
+    "↗ Improving",
+    IF(
+        [Month over Month Change] < 0,
+        "↘ Declining",
+        "→ Stable"
+    )
+)
+
+Performance Level = 
+VAR CurrentScore = [Current Month Score]
+VAR AvgScore = [Average Score]
+RETURN
+    IF(
+        CurrentScore >= AvgScore * 1.1,
+        "Excellent",
+        IF(
+            CurrentScore >= AvgScore,
+            "Good",
+            IF(
+                CurrentScore >= AvgScore * 0.9,
+                "Average",
+                "Below Average"
+            )
+        )
+    )
+
+// ======================
+// TIME INTELLIGENCE
+// ======================
+
+Year to Date Average = 
+CALCULATE(
+    AVERAGE('IBD_Scorecard'[Score]),
+    DATESYTD('IBD_Scorecard'[Date])
+)
+
+Quarter to Date Average = 
+CALCULATE(
+    AVERAGE('IBD_Scorecard'[Score]),
+    DATESQTD('IBD_Scorecard'[Date])
+)
+
+Last 12 Months Average = 
+CALCULATE(
+    AVERAGE('IBD_Scorecard'[Score]),
+    DATESINPERIOD('IBD_Scorecard'[Date], MAX('IBD_Scorecard'[Date]), -12, MONTH)
+)
+
+// ======================
+// STATISTICAL MEASURES
+// ======================
+
+Standard Deviation = 
+STDEV.P('IBD_Scorecard'[Score])
+
+Coefficient of Variation = 
+DIVIDE([Standard Deviation], [Average Score], 0)
+
+Score Range = 
+[Max Score] - [Min Score]
+
+Median Score = 
+MEDIAN('IBD_Scorecard'[Score])
+
+// ======================
+// CONDITIONAL MEASURES
+// ======================
+
+High Performance Count = 
+CALCULATE(
+    COUNTROWS('IBD_Scorecard'),
+    'IBD_Scorecard'[Score] > [Average Score] * 1.1
+)
+
+Low Performance Count = 
+CALCULATE(
+    COUNTROWS('IBD_Scorecard'),
+    'IBD_Scorecard'[Score] < [Average Score] * 0.9
+)
+
+High Performance % = 
+DIVIDE([High Performance Count], [Total Rows], 0)
+
+===============================================
+USAGE INSTRUCTIONS:
+===============================================
+
+1. In Power BI Desktop, go to "Modeling" tab
+2. Click "New Measure"
+3. Copy and paste each measure above
+4. Update table and column names to match your data
+5. Create measures one at a time
+6. Test each measure before proceeding to the next
+
+KEY UPDATES NEEDED:
+- Replace 'IBD_Scorecard' with your actual table name
+- Replace 'Score' with your actual score column name
+- Replace 'Date' with your actual date column name
+
+These measures will give you comprehensive analytics for your scorecard dashboard!

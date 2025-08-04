@@ -1,0 +1,28 @@
+# Data Files (too large for Git)
+PowerBI_Data/
+*.parquet
+*.csv
+
+# Power BI Files
+*.pbix
+*.pbit
+
+# Temporary files
+~$*
+*.tmp
+
+# AWS Credentials
+.aws/
+*.pem
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+
+# Cache
+.cache/
+*.cache
