@@ -1,0 +1,51 @@
+﻿
+Id CommandLine                                                                                                                                                                                          
+-- -----------                                                                                                                                                                                          
+ 1 Remove-Module -Name PSReadline;$global:_warpOriginalPrompt = $function:global:prompt;if ($PSEdition -eq 'Desktop' -or $IsWindows) {;    $EP = [Microsoft.PowerShell.ExecutionPolicy];    if ((Get-...
+ 2  . 'C:\Users\ahamedirshad\AppData\Local\Programs\Warp\pwsh.ps1'                                                                                                                                      
+ 3 aws --version                                                                                                                                                                                        
+ 4 Get-Module -ListAvailable -Name AWS*                                                                                                                                                                 
+ 5 winget install Amazon.AWSCLI                                                                                                                                                                         
+ 6 refreshenv; aws --version                                                                                                                                                                            
+ 7 $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH","User"); aws --version                                        
+ 8 aws configure                                                                                                                                                                                        
+ 9 aws s3 ls                                                                                                                                                                                            
+10 (aws s3 ls s3://scorecard/ --recursive) | \Out-Host                                                                                                                                                  
+11 New-Item -ItemType Directory -Force -Path ".\PowerBI_Data"                                                                                                                                           
+12 aws s3 sync s3://scorecard/IBD/2023/ .\PowerBI_Data\2023\ --exclude "*" --include "*.parquet"                                                                                                        
+13 aws s3 sync s3://scorecard/IBD/2024/ .\PowerBI_Data\2024\ --exclude "*" --include "*.parquet"                                                                                                        
+14 aws s3 sync s3://scorecard/IBD/2025/ .\PowerBI_Data\2025\ --exclude "*" --include "*.parquet"                                                                                                        
+15 Get-ChildItem -Path .\PowerBI_Data -Recurse -Name | Sort-Object                                                                                                                                      
+16 python -c "import pandas as pd; df = pd.read_parquet('./PowerBI_Data/2024/202401_ibd_scorecard.parquet'); print('Shape:', df.shape); print('\nColumns:'); print(df.columns.tolist()); print('\nFir...
+17 winget install Python.Python.3.12                                                                                                                                                                    
+18 $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH","User"); python --version                                     
+19 pip install pandas pyarrow                                                                                                                                                                           
+20 pip install --only-binary=all pandas pyarrow                                                                                                                                                         
+21 Get-ChildItem -Path .\PowerBI_Data -Recurse -Include *.parquet | Measure-Object -Property Length -Sum | Select-Object Count, @{Name="TotalSizeMB";Expression={[math]::Round($_.Sum/1MB,2)}}          
+22 pip install fastparquet                                                                                                                                                                              
+23 notepad "C:\Users\ahamedirshad\PowerBI_Setup_Guide.txt"                                                                                                                                              
+24 Get-ChildItem -Path "C:\Users\ahamedirshad\PowerBI_Data" -Recurse -Name | Select-Object -First 5                                                                                                     
+25 git --version                                                                                                                                                                                        
+26 New-Item -ItemType Directory -Force -Path ".\IBD-Scorecard-PowerBI"                                                                                                                                  
+27 Copy-Item -Path "PowerBI_Setup_Guide.txt" -Destination ".\IBD-Scorecard-PowerBI\"                                                                                                                    
+28 Copy-Item -Path "PowerQuery_Script.txt" -Destination ".\IBD-Scorecard-PowerBI\"                                                                                                                      
+29 Copy-Item -Path "DAX_Measures.txt" -Destination ".\IBD-Scorecard-PowerBI\"                                                                                                                           
+30 cd "C:\Users\ahamedirshad\IBD-Scorecard-PowerBI"; git init                                                                                                                                           
+31 ls                                                                                                                                                                                                   
+32 git add .                                                                                                                                                                                            
+33 git status                                                                                                                                                                                           
+34 . { git commit -m "Initial commit: IBD Scorecard Power BI project setup...                                                                                                                           
+35 git config --global user.name                                                                                                                                                                        
+36 git config --global user.email                                                                                                                                                                       
+37 gh --version                                                                                                                                                                                         
+38 winget install GitHub.cli                                                                                                                                                                            
+39 gh auth login --web                                                                                                                                                                                  
+40 $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH","User"); gh --version                                         
+41 gh auth login --web                                                                                                                                                                                  
+42 gh repo create IBD-Scorecard-PowerBI --public --source=. --remote=origin                                                                                                                             
+43 git branch -M main                                                                                                                                                                                   
+44 git push -u origin main                                                                                                                                                                              
+45 Get-History | Export-Csv -Path "command_history.csv" -NoTypeInformation                                                                                                                              
+
+
+
