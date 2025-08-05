@@ -1,0 +1,172 @@
+let
+    // ====== CONFIGURATION - UPDATE THESE VALUES ======
+    BucketName = "your-s3-bucket-name",
+    Region = "us-east-1",
+    AccessKey = "your-access-key-id",
+    SecretKey = "your-secret-access-key",
+    Prefix = "data/parquet/", // S3 folder path (use "" for root)
+    YearsToInclude = {2024, 2025},
+    
+    // ====== AWS SIGNATURE V4 HELPER FUNCTIONS ======
+    
+    // Convert text to hex
+    TextToHex = (text as text) as text =>
+        let
+            bytes = Text.ToBinary(text, TextEncoding.Utf8),
+            hex = Binary.ToText(bytes, BinaryEncoding.Hex)
+        in
+            Text.Lower(hex),
+    
+    // HMAC-SHA256 function
+    HmacSha256 = (key as binary, message as text) as binary =>
+        Crypto.CreateHmac(CryptoAlgorithm.SHA256, key, Text.ToBinary(message, TextEncoding.Utf8)),
+    
+    // Create AWS Signature V4
+    CreateAwsSignatureV4 = (method as text, url as text, headers as record, payload as text) as record =>
+        let
+            Uri = Uri.Parts(url),
+            Host = Uri[Host],
+            Path = Uri[Path],
+            Query = if Uri[Query] = null then "" else Uri[Query],
+            
+            // Date and time
+            Now = DateTimeZone.UtcNow(),
+            DateStamp = Date.ToText(DateTime.Date(Now), "yyyyMMdd"),
+            TimeStamp = DateTimeZone.ToText(Now, [Format="yyyyMMdd'T'HHmmss'Z'", Culture=""]),
+            
+            // Canonical request
+            CanonicalHeaders = "host:" & Host & Text.NewLine & "x-amz-date:" & TimeStamp & Text.NewLine,
+            SignedHeaders = "host;x-amz-date",
+            PayloadHash = Text.Lower(Binary.ToText(Crypto.CreateHash(CryptoAlgorithm.SHA256, Text.ToBinary(payload, TextEncoding.Utf8)), BinaryEncoding.Hex)),
+            CanonicalRequest = method & Text.NewLine & Path & Text.NewLine & Query & Text.NewLine & CanonicalHeaders & Text.NewLine & SignedHeaders & Text.NewLine & PayloadHash,
+            
+            // String to sign
+            Algorithm = "AWS4-HMAC-SHA256",
+            CredentialScope = DateStamp & "/" & Region & "/s3/aws4_request",
+            StringToSign = Algorithm & Text.NewLine & TimeStamp & Text.NewLine & CredentialScope & Text.NewLine & Text.Lower(Binary.ToText(Crypto.CreateHash(CryptoAlgorithm.SHA256, Text.ToBinary(CanonicalRequest, TextEncoding.Utf8)), BinaryEncoding.Hex)),
+            
+            // Calculate signature
+            SigningKey = List.Accumulate(
+                {DateStamp, Region, "s3", "aws4_request"},
+                Text.ToBinary("AWS4" & SecretKey, TextEncoding.Utf8),
+                (state, value) => HmacSha256(state, value)
+            ),
+            Signature = Text.Lower(Binary.ToText(HmacSha256(SigningKey, StringToSign), BinaryEncoding.Hex)),
+            
+            // Authorization header
+            AuthorizationHeader = Algorithm & " Credential=" & AccessKey & "/" & CredentialScope & ", SignedHeaders=" & SignedHeaders & ", Signature=" & Signature,
+            
+            // Final headers
+            FinalHeaders = Record.Combine({
+                headers,
+                [
+                    #"Authorization" = AuthorizationHeader,
+                    #"x-amz-date" = TimeStamp,
+                    #"Host" = Host
+                ]
+            })
+        in
+            [Headers = FinalHeaders, Timestamp = TimeStamp],
+    
+    // ====== S3 OPERATIONS ======
+    
+    // List S3 objects with proper authentication
+    ListS3Objects = (bucketName as text, prefix as text) as table =>
+        let
+            BaseUrl = "https://" & bucketName & ".s3." & Region & ".amazonaws.com",
+            ListUrl = BaseUrl & "/?list-type=2" & (if prefix = "" then "" else "&prefix=" & Uri.EscapeDataString(prefix)),
+            
+            // Create authenticated request
+            AuthInfo = CreateAwsSignatureV4("GET", ListUrl, [], ""),
+            
+            // Make request
+            Response = try Web.Contents(ListUrl, [Headers = AuthInfo[Headers]]) otherwise null,
+            
+            Result = if Response = null then 
+                #table({"Key", "Size", "LastModified"}, {}) 
+            else
+                let
+                    XmlDoc = Xml.Document(Response),
+                    ListBucketResult = XmlDoc{0},
+                    Contents = try ListBucketResult[Contents] otherwise {},
+                    
+                    ObjectTable = if List.IsEmpty(Contents) then 
+                        #table({"Key", "Size", "LastModified"}, {}) 
+                    else
+                        let
+                            ObjectList = if Value.Is(Contents, type list) then Contents else {Contents},
+                            ConvertedList = List.Transform(ObjectList, each 
+                                [
+                                    Key = _{0}[#text]? ?? _[Key][#text]? ?? "",
+                                    Size = try Number.FromText(_{1}[#text]? ?? _[Size][#text]? ?? "0") otherwise 0,
+                                    LastModified = try DateTime.FromText(_{2}[#text]? ?? _[LastModified][#text]? ?? "") otherwise #datetime(1900,1,1,0,0,0)
+                                ]
+                            ),
+                            TableFromList = Table.FromList(ConvertedList, Splitter.SplitByNothing()),
+                            ExpandedTable = Table.ExpandRecordColumn(Table.FromList(ConvertedList), "Column1", {"Key", "Size", "LastModified"}, {"Key", "Size", "LastModified"})
+                        in
+                            ExpandedTable
+                in
+                    ObjectTable
+        in
+            Result,
+    
+    // Download S3 object with authentication
+    DownloadS3Object = (bucketName as text, objectKey as text) as binary =>
+        let
+            BaseUrl = "https://" & bucketName & ".s3." & Region & ".amazonaws.com",
+            ObjectUrl = BaseUrl & "/" & Uri.EscapeDataString(objectKey),
+            
+            // Create authenticated request
+            AuthInfo = CreateAwsSignatureV4("GET", ObjectUrl, [], ""),
+            
+            // Download object
+            ObjectData = Web.Contents(ObjectUrl, [Headers = AuthInfo[Headers]])
+        in
+            ObjectData,
+    
+    // ====== MAIN LOGIC ======
+    
+    // Get list of all objects
+    AllObjects = ListS3Objects(BucketName, Prefix),
+    
+    // Filter for parquet files from specified years
+    FilteredObjects = Table.SelectRows(AllObjects, each 
+        Text.EndsWith(Text.Lower([Key]), ".parquet") and
+        List.AnyTrue(List.Transform(YearsToInclude, (year) => Text.Contains([Key], Text.From(year))))
+    ),
+    
+    // Add a function to download and parse each parquet file
+    AddDownloadFunction = Table.AddColumn(FilteredObjects, "DownloadParquet", each 
+        () => 
+            let
+                ParquetBinary = DownloadS3Object(BucketName, [Key]),
+                ParquetTable = Parquet.Document(ParquetBinary),
+                
+                // Add metadata columns
+                WithSourceFile = Table.AddColumn(ParquetTable, "SourceFile", each [Key]),
+                WithFileYear = Table.AddColumn(WithSourceFile, "FileYear", each 
+                    let
+                        MatchingYear = List.Select(YearsToInclude, (year) => Text.Contains([Key], Text.From(year)))
+                    in
+                        if List.IsEmpty(MatchingYear) then null else List.First(MatchingYear)
+                ),
+                WithLoadTimestamp = Table.AddColumn(WithFileYear, "LoadTimestamp", each DateTimeZone.UtcNow())
+            in
+                WithLoadTimestamp
+    ),
+    
+    // Execute downloads and combine all data
+    DownloadedTables = Table.AddColumn(AddDownloadFunction, "Data", each [DownloadParquet]()),
+    
+    // Combine all parquet data into single table
+    CombinedData = if Table.RowCount(DownloadedTables) = 0 then
+        #table({"Message"}, {{"No parquet files found for the specified years"}})
+    else
+        let
+            AllTables = DownloadedTables[Data],
+            CombinedTable = Table.Combine(AllTables)
+        in
+            CombinedTable
+in
+    CombinedData
